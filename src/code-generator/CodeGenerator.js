@@ -1,20 +1,20 @@
-import domEvents from './dom-events-to-record'
-import pptrActions from './pptr-actions'
-import Block from './Block'
+import domEvents from './dom-events-to-record';
+import pptrActions from './pptr-actions';
+import Block from './Block';
 
-const importPuppeteer = `const puppeteer = require('puppeteer');\n`
+const importPuppeteer = `const puppeteer = require('puppeteer');\n`;
 
 const header = `const browser = await puppeteer.launch()
-const page = await browser.newPage()`
+const page = await browser.newPage()`;
 
-const footer = `await browser.close()`
+const footer = `await browser.close()`;
 
 const wrappedHeader = `(async () => {
   const browser = await puppeteer.launch()
-  const page = await browser.newPage()\n`
+  const page = await browser.newPage()\n`;
 
 const wrappedFooter = `  await browser.close()
-})()`
+})()`;
 
 export const defaults = {
   wrapAsync: true,
@@ -22,199 +22,311 @@ export const defaults = {
   waitForNavigation: true,
   waitForSelectorOnClick: true,
   blankLinesBetweenBlocks: true,
-  dataAttribute: ''
-}
+  dataAttribute: '',
+};
 
 export default class CodeGenerator {
-  constructor (options) {
-    this._options = Object.assign(defaults, options)
-    this._blocks = []
-    this._frame = 'page'
-    this._frameId = 0
-    this._allFrames = {}
-    this._screenshotCounter = 1
+  constructor(options) {
+    this._options = Object.assign(defaults, options);
+    this._blocks = [];
+    this._frame = 'page';
+    this._frameId = 0;
+    this._allFrames = {};
+    this._screenshotCounter = 1;
 
-    this._hasNavigation = false
+    this._hasNavigation = false;
   }
 
-  generate (events) {
-    return importPuppeteer + this._getHeader() + this._parseEvents(events) + this._getFooter()
+  generate(events) {
+
+      //过滤events
+
+    return (
+      // importPuppeteer +
+      // this._getHeader() +
+      this._parseEvents(events)
+      // this._getFooter()
+    );
+  }
+ 
+  _getHeader() {
+    console.debug(this._options);
+    let hdr = this._options.wrapAsync ? wrappedHeader : header;
+    hdr = this._options.headless
+      ? hdr
+      : hdr.replace('launch()', 'launch({ headless: false })');
+    return hdr;
   }
 
-  _getHeader () {
-    console.debug(this._options)
-    let hdr = this._options.wrapAsync ? wrappedHeader : header
-    hdr = this._options.headless ? hdr : hdr.replace('launch()', 'launch({ headless: false })')
-    return hdr
+  _getFooter() {
+    return this._options.wrapAsync ? wrappedFooter : footer;
   }
 
-  _getFooter () {
-    return this._options.wrapAsync ? wrappedFooter : footer
-  }
+  _parseEvents(events) {
+    console.debug(`generating code for ${events ? events.length : 0} events`);
+    let result = '';
 
-  _parseEvents (events) {
-    console.debug(`generating code for ${events ? events.length : 0} events`)
-    let result = ''
-
-    if (!events) return result
+    if (!events) return result;
 
     for (let i = 0; i < events.length; i++) {
-      const { action, selector, value, href, keyCode, tagName, frameId, frameUrl } = events[i]
+      const {
+        action,
+        selector,
+        value,
+        href,
+        keyCode,
+        tagName,
+        frameId,
+        frameUrl,
+      } = events[i];
 
       // we need to keep a handle on what frames events originate from
-      this._setFrames(frameId, frameUrl)
+      this._setFrames(frameId, frameUrl);
 
       switch (action) {
         case 'keydown':
-          if (keyCode === 9) { // tab key
-            this._blocks.push(this._handleKeyDown(selector, value, keyCode))
+          if (keyCode === 9) {
+            // tab key
+            this._blocks.push(this._handleKeyDown(selector, value, keyCode));
           }
-          break
+          break;
         case 'click':
-          this._blocks.push(this._handleClick(selector, events))
-          break
+          this._blocks.push(this._handleClick(selector, events));
+          break;
+        case 'input':
+          this._blocks.push(this._handleInput(selector, value));
+          break;
+        // case 'mouseover':
+        //   this._blocks.push(this._handleMouseOver(selector, events));
+        //   break;
+        // case 'mouseout':
+        //   this._blocks.push(this._handleMouseout(selector, events));
+        //   break;
         case 'change':
           if (tagName === 'SELECT') {
-            this._blocks.push(this._handleChange(selector, value))
+            this._blocks.push(this._handleChange(selector, value));
           }
-          break
+          break;
         case pptrActions.GOTO:
-          this._blocks.push(this._handleGoto(href, frameId))
-          break
+          this._blocks.push(this._handleGoto(href, frameId));
+          break;
         case pptrActions.VIEWPORT:
-          this._blocks.push((this._handleViewport(value.width, value.height)))
-          break
+          this._blocks.push(this._handleViewport(value.width, value.height));
+          break;
         case pptrActions.NAVIGATION:
-          this._blocks.push(this._handleWaitForNavigation())
-          this._hasNavigation = true
-          break
+          this._blocks.push(this._handleWaitForNavigation());
+          this._hasNavigation = true;
+          break;
         case pptrActions.SCREENSHOT:
-          this._blocks.push(this._handleScreenshot(value))
-          break
+          this._blocks.push(this._handleScreenshot(value));
+          break;
       }
     }
 
     if (this._hasNavigation && this._options.waitForNavigation) {
-      console.debug('Adding navigationPromise declaration')
-      const block = new Block(this._frameId, { type: pptrActions.NAVIGATION_PROMISE, value: 'const navigationPromise = page.waitForNavigation()' })
-      this._blocks.unshift(block)
+      console.debug('Adding navigationPromise declaration');
+      const block = new Block(this._frameId, {
+        type: pptrActions.NAVIGATION_PROMISE,
+        value: 'const navigationPromise = page.waitForNavigation()',
+      });
+      this._blocks.unshift(block);
     }
 
-    console.debug('post processing blocks:', this._blocks)
-    this._postProcess()
+    console.debug('post processing blocks:', this._blocks);
+    this._postProcess();
 
-    const indent = this._options.wrapAsync ? '  ' : ''
-    const newLine = `\n`
+    const indent = this._options.wrapAsync ? '  ' : '';
+    const newLine = `\n`;
 
     for (let block of this._blocks) {
-      const lines = block.getLines()
+      const lines = block.getLines();
       for (let line of lines) {
-        result += indent + line.value + newLine
+        result += indent + line.value + newLine;
       }
     }
 
-    return result
+    return result;
   }
 
-  _setFrames (frameId, frameUrl) {
+  _setFrames(frameId, frameUrl) {
     if (frameId && frameId !== 0) {
-      this._frameId = frameId
-      this._frame = `frame_${frameId}`
-      this._allFrames[frameId] = frameUrl
+      this._frameId = frameId;
+      this._frame = `frame_${frameId}`;
+      this._allFrames[frameId] = frameUrl;
     } else {
-      this._frameId = 0
-      this._frame = 'page'
+      this._frameId = 0;
+      this._frame = 'page';
     }
   }
 
-  _postProcess () {
+  _postProcess() {
     // when events are recorded from different frames, we want to add a frame setter near the code that uses that frame
     if (Object.keys(this._allFrames).length > 0) {
-      this._postProcessSetFrames()
+      this._postProcessSetFrames();
     }
 
     if (this._options.blankLinesBetweenBlocks && this._blocks.length > 0) {
-      this._postProcessAddBlankLines()
+      this._postProcessAddBlankLines();
     }
   }
 
-  _handleKeyDown (selector, value) {
-    const block = new Block(this._frameId)
-    block.addLine({ type: domEvents.KEYDOWN, value: `await ${this._frame}.type('${selector}', '${value}')` })
-    return block
+  _handleKeyDown(selector, value) {
+    const block = new Block(this._frameId);
+    block.addLine({
+      type: domEvents.KEYDOWN,
+      value: `await ${this._frame}.type('${selector}', '${value}')`,
+    });
+    return block;
   }
 
-  _handleClick (selector) {
-    const block = new Block(this._frameId)
+  _handleClick(selector) {
+    const block = new Block(this._frameId);
     if (this._options.waitForSelectorOnClick) {
-      block.addLine({ type: domEvents.CLICK, value: `await ${this._frame}.waitForSelector('${selector}')` })
+      block.addLine({
+        type: domEvents.CLICK,
+        value: `await ${this._frame}.waitForSelector('${selector}')`,
+      });
     }
-    block.addLine({ type: domEvents.CLICK, value: `await ${this._frame}.click('${selector}')` })
-    return block
+    block.addLine({
+      type: domEvents.CLICK,
+      value: `await ${this._frame}.click('${selector}')`,
+    });
+    return block;
   }
-  _handleChange (selector, value) {
-    return new Block(this._frameId, { type: domEvents.CHANGE, value: `await ${this._frame}.select('${selector}', '${value}')` })
+  _handleInput(selector,value) {
+    const block = new Block(this._frameId);
+    if (this._options.waitForSelectorOnClick) {
+      block.addLine({
+        type: domEvents.INPUT,
+        value: `await ${this._frame}.waitForSelector('${selector}')`,
+      });
+    }
+    block.addLine({
+      type: domEvents.INPUT,
+      value: `await ${this._frame}.type('${selector}','${value}')`,
+    });
+    return block;
   }
-  _handleGoto (href) {
-    return new Block(this._frameId, { type: pptrActions.GOTO, value: `await ${this._frame}.goto('${href}')` })
+  _handleMouseOver(selector) {
+    const block = new Block(this._frameId);
+    if (this._options.waitForSelectorOnClick) {
+      block.addLine({
+        type: domEvents.MOUSEOVER,
+        value: `await ${this._frame}.waitForSelector('${selector}')`,
+      });
+    }
+    block.addLine({
+      type: domEvents.MOUSEOVER,
+      value: `await ${this._frame}.mouseOver('${selector}')`,
+    });
+    return block;
+  }
+  _handleMouseout(selector) {
+    const block = new Block(this._frameId);
+    if (this._options.waitForSelectorOnClick) {
+      block.addLine({
+        type: domEvents.MOUSEOUT,
+        value: `await ${this._frame}.waitForSelector('${selector}')`,
+      });
+    }
+    block.addLine({
+      type: domEvents.MOUSEOUT,
+      value: `await ${this._frame}.mouseOut('${selector}')`,
+    });
+    return block;
+  }
+  _handleChange(selector, value) {
+    return new Block(this._frameId, {
+      type: domEvents.CHANGE,
+      value: `await ${this._frame}.select('${selector}', '${value}')`,
+    });
+  }
+  _handleGoto(href) {
+    return new Block(this._frameId, {
+      type: pptrActions.GOTO,
+      value: `await ${this._frame}.goto('${href}')`,
+    });
   }
 
-  _handleViewport (width, height) {
-    return new Block(this._frameId, { type: pptrActions.VIEWPORT, value: `await ${this._frame}.setViewport({ width: ${width}, height: ${height} })` })
+  _handleViewport(width, height) {
+    return new Block(this._frameId, {
+      type: pptrActions.VIEWPORT,
+      value: `await ${this
+        ._frame}.setViewport({ width: ${width}, height: ${height} })`,
+    });
   }
 
-  _handleScreenshot (options) {
-    let block
+  _handleScreenshot(options) {
+    let block;
 
     if (options && options.x && options.y && options.width && options.height) {
       // remove the tailing 'px'
       for (let prop in options) {
         if (options.hasOwnProperty(prop) && options[prop].slice(-2) === 'px') {
-          options[prop] = options[prop].substring(0, options[prop].length - 2)
+          options[prop] = options[prop].substring(0, options[prop].length - 2);
         }
       }
 
       block = new Block(this._frameId, {
         type: pptrActions.SCREENSHOT,
-        value: `await ${this._frame}.screenshot({ path: 'screenshot_${this._screenshotCounter}.png', clip: { x: ${options.x}, y: ${options.y}, width: ${options.width}, height: ${options.height} } })` })
+        value: `await ${this._frame}.screenshot({ path: 'screenshot_${this
+          ._screenshotCounter}.png', clip: { x: ${options.x}, y: ${options.y}, width: ${options.width}, height: ${options.height} } })`,
+      });
     } else {
-      block = new Block(this._frameId, { type: pptrActions.SCREENSHOT, value: `await ${this._frame}.screenshot({ path: 'screenshot_${this._screenshotCounter}.png' })` })
+      block = new Block(this._frameId, {
+        type: pptrActions.SCREENSHOT,
+        value: `await ${this._frame}.screenshot({ path: 'screenshot_${this
+          ._screenshotCounter}.png' })`,
+      });
     }
 
-    this._screenshotCounter++
-    return block
+    this._screenshotCounter++;
+    return block;
   }
 
-  _handleWaitForNavigation () {
-    const block = new Block(this._frameId)
+  _handleWaitForNavigation() {
+    const block = new Block(this._frameId);
     if (this._options.waitForNavigation) {
-      block.addLine({type: pptrActions.NAVIGATION, value: `await navigationPromise`})
+      block.addLine({
+        type: pptrActions.NAVIGATION,
+        value: `await navigationPromise`,
+      });
     }
-    return block
+    return block;
   }
 
-  _postProcessSetFrames () {
+  _postProcessSetFrames() {
     for (let [i, block] of this._blocks.entries()) {
-      const lines = block.getLines()
+      const lines = block.getLines();
       for (let line of lines) {
-        if (line.frameId && Object.keys(this._allFrames).includes(line.frameId.toString())) {
-          const declaration = `const frame_${line.frameId} = frames.find(f => f.url() === '${this._allFrames[line.frameId]}')`
-          this._blocks[i].addLineToTop(({ type: pptrActions.FRAME_SET, value: declaration }))
-          this._blocks[i].addLineToTop({ type: pptrActions.FRAME_SET, value: 'let frames = await page.frames()' })
-          delete this._allFrames[line.frameId]
-          break
+        if (
+          line.frameId &&
+          Object.keys(this._allFrames).includes(line.frameId.toString())
+        ) {
+          const declaration = `const frame_${line.frameId} = frames.find(f => f.url() === '${this
+            ._allFrames[line.frameId]}')`;
+          this._blocks[i].addLineToTop({
+            type: pptrActions.FRAME_SET,
+            value: declaration,
+          });
+          this._blocks[i].addLineToTop({
+            type: pptrActions.FRAME_SET,
+            value: 'let frames = await page.frames()',
+          });
+          delete this._allFrames[line.frameId];
+          break;
         }
       }
     }
   }
 
-  _postProcessAddBlankLines () {
-    let i = 0
+  _postProcessAddBlankLines() {
+    let i = 0;
     while (i <= this._blocks.length) {
-      const blankLine = new Block()
-      blankLine.addLine({ type: null, value: '' })
-      this._blocks.splice(i, 0, blankLine)
-      i += 2
+      const blankLine = new Block();
+      blankLine.addLine({type: null, value: ''});
+      this._blocks.splice(i, 0, blankLine);
+      i += 2;
     }
   }
 }

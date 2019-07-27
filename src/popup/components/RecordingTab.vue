@@ -18,7 +18,7 @@
             </div>
             <div class="event-description">
               <div class="event-action">{{event.action}}</div>
-              <div class="event-props text-muted">{{event.selector || parseEventValue(event)}}</div>
+              <div class="event-props text-muted">{{event.selector || parseEventValue(event)}} :{{event.value}} </div>
             </div>
           </li>
         </ul>

@@ -5,6 +5,9 @@ export default {
   KEYDOWN: 'keydown',
   SELECT: 'select',
   SUBMIT: 'submit',
+  // MOUSEOVER: 'mouseover',
+  // MOUSEOUT: 'mouseout',
+  INPUT: 'input',
   LOAD: 'load',
   UNLOAD: 'unload'
 }

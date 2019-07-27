@@ -105,9 +105,17 @@ export default class EventRecorder {
         ? EventRecorder._formatDataSelector(e.target, this._dataAttribute)
         : finder(e.target, {seedMinLength: 5, optimizedMinLength: optimizedMinLength})
 
+        let value = e.target.value;
+      //TODO 这里的写法不太合适.
+        if(e.type ==='input'){
+            value=e.data;
+        } else if(e.type === 'keydown'){
+            value=e.key;
+        }
+
       const msg = {
         selector: selector,
-        value: e.target.value,
+        value,
         tagName: e.target.tagName,
         action: e.type,
         keyCode: e.keyCode ? e.keyCode : null,
