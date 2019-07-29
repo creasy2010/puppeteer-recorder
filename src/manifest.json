@@ -5,10 +5,13 @@
   "description": "A Chrome extension for recording browser interaction and generating Puppeteer scripts",
   "permissions": [
     "storage",
+    "debugger",
+    "webRequest",
+    "webRequestBlocking",
     "webNavigation",
     "tabs",
     "contextMenus",
-    "*://*/"
+    "<all_urls>"
   ],
   "icons" : {
     "16": "images/app_icon_16.png",
@@ -40,7 +43,7 @@
     "scripts": [
       "background.js"
     ],
-    "persistent": false
+    "persistent": true
   },
   "options_ui": {
     "page": "options.html",

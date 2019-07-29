@@ -60,6 +60,35 @@ class RecordingController {
       chrome.browserAction.setBadgeText({ text: this._badgeState })
       chrome.browserAction.setBadgeBackgroundColor({ color: '#FF0000' })
 
+        // 记录请求:
+        chrome.webRequest.onBeforeRequest.addListener(
+            (details)=>{
+                console.log(details);
+            },
+            {urls: [ "<all_urls>" ]},['blocking']
+            );
+        chrome.webRequest.onCompleted.addListener(
+            (details)=>{
+                console.log(details);
+
+                if(details.tabId && details.tabId > 0){
+                    chrome.debugger.sendCommand({
+                        tabId: details.tabId
+                    }, "Network.getResponseBody", {
+                        "requestId": details.requestId
+                    }, function(response) {
+                        debugger;
+                        // you get the response body here!
+                        // you can close the debugger tips by:
+                        // chrome.debugger.detach(debuggeeId);
+                    });
+                }
+
+
+            },
+            {urls: [ "<all_urls>" ]},['extraHeaders']
+        );
+
       /**
        * Right click menu setup
        */
@@ -89,6 +118,8 @@ class RecordingController {
       })
 
       // add the handlers
+
+
 
       this._boundedMenuHandler = this.handleMenuInteraction.bind(this)
       chrome.contextMenus.onClicked.addListener(this._boundedMenuHandler)

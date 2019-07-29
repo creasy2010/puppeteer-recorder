@@ -122,6 +122,9 @@ export default class EventRecorder {
         href: e.target.href ? e.target.href : null,
         coordinates: EventRecorder._getCoordinates(e)
       }
+        if(e.type === 'click'){
+            msg.mark = e.target.innerText;
+        }
       this._sendMessage(msg)
     } catch (e) {}
   }

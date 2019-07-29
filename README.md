@@ -1,3 +1,11 @@
+
+## TODO
+
+1. 删除功能还没添加过来;
+2. 全选 删除类似快捷键还没有;
+4. select checkbox radio等组件录制;
+5. http请求信息统计起来.
+
 # Puppeteer Recorder
 
 [![Build Status](https://travis-ci.org/checkly/puppeteer-recorder.svg?branch=develop)](https://travis-ci.org/checkly/puppeteer-recorder)

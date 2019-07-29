@@ -48,7 +48,7 @@ export default class CodeGenerator {
       // this._getFooter()
     );
   }
- 
+
   _getHeader() {
     console.debug(this._options);
     let hdr = this._options.wrapAsync ? wrappedHeader : header;
@@ -91,7 +91,7 @@ export default class CodeGenerator {
           }
           break;
         case 'click':
-          this._blocks.push(this._handleClick(selector, events));
+          this._blocks.push(this._handleClick(selector, events[i].mark));
           break;
         case 'input':
           this._blocks.push(this._handleInput(selector, value));
@@ -179,7 +179,7 @@ export default class CodeGenerator {
     return block;
   }
 
-  _handleClick(selector) {
+  _handleClick(selector,mark) {
     const block = new Block(this._frameId);
     if (this._options.waitForSelectorOnClick) {
       block.addLine({
@@ -189,7 +189,10 @@ export default class CodeGenerator {
     }
     block.addLine({
       type: domEvents.CLICK,
-      value: `await ${this._frame}.click('${selector}')`,
+      value: `
+      // 点击按钮 ${mark}
+      await ${this._frame}.click('${selector}'); 
+      await sleep(1)`,
     });
     return block;
   }
