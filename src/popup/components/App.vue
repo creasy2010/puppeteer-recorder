@@ -115,7 +115,7 @@ export default {
         console.debug('stop recorder')
         this.bus.postMessage({ action: actions.STOP })
 
-        this.$chrome.storage.local.get(['recording', 'options'], ({ recording, options }) => {
+        this.$chrome.storage.local.get(['recording', 'options','network'], ({ recording, options ,network}) => {
           console.debug('loaded recording', recording)
           console.debug('loaded options', options)
 
@@ -123,7 +123,7 @@ export default {
           const codeOptions = options ? options.code : {}
 
           const codeGen = new CodeGenerator(codeOptions)
-          this.code = codeGen.generate(this.recording)
+          this.code = codeGen.generate(this.recording,network)
           this.showResultsTab = true
           this.storeState()
         })

@@ -37,15 +37,11 @@ export default class CodeGenerator {
     this._hasNavigation = false;
   }
 
-  generate(events) {
-
-      //过滤events
-
-    return (
-      // importPuppeteer +
-      // this._getHeader() +
-      this._parseEvents(events)
-      // this._getFooter()
+  generate(events,network) {
+    return (`
+    ${this._parseEvents(events)}
+    var networkStorage = ${JSON.stringify(network)};
+    `
     );
   }
 

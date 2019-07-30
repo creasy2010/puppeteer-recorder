@@ -5,6 +5,7 @@ import actions from '../models/extension-ui-actions'
 class RecordingController {
   constructor () {
     this._recording = []
+    this._network = {}
     this._boundedMessageHandler = null
     this._boundedNavigationHandler = null
     this._boundedWaitHandler = null
@@ -12,6 +13,7 @@ class RecordingController {
     this._boundedKeyCommandHandler = null
     this._badgeState = ''
     this._isPaused = false
+    this._tabId =null;
 
     // Some events are sent double on page navigations to simplify the event recorder.
     // We keep some simple state to disregard events if needed.
@@ -60,34 +62,58 @@ class RecordingController {
       chrome.browserAction.setBadgeText({ text: this._badgeState })
       chrome.browserAction.setBadgeBackgroundColor({ color: '#FF0000' })
 
+
+        chrome.tabs.query({active:true,currentWindow:true},(tab)=>{
+            this._tabId = tab[0].id;
+            let _requestRel = {
+            };
+            chrome.debugger.attach({tabId:this._tabId},"1.0",(result)=>{
+                chrome.debugger.onEvent.addListener((source,method,params)=>{
+                    if(method==='Network.requestWillBeSent') {
+                        let {requestId,request:{url,method,postData}} = params;
+                        let key = `${url}:[${method}]`;
+                        if(this._network[key]) {
+                            this._network[key].push({
+                                url,
+                                postData,
+                                requestId,
+                                method,
+                                response:null
+                            });
+                            _requestRel[requestId] = this._network[key];
+                        }
+                    } else if(method==='Network.responseReceived') {
+                        let {requestId,response} = params;
+                        chrome.debugger.sendCommand({
+                            tabId: this._tabId
+                        }, "Network.getResponseBody", {
+                            "requestId": requestId
+                        }, function(response) {
+                            let {body,base64Encoded} = response;
+                            _requestRel[requestId].response={...response,body,base64Encoded};
+                            if(!response) {
+                                console.error(chrome.runtime.lastError);
+                            }
+                        });
+                    }
+                });
+
+                chrome.debugger.sendCommand({
+                    tabId: this._tabId
+                }, "Network.enable");
+
+                // chrome.webRequest.onCompleted.addListener( this.handleNetwork,
+                //     {urls: [ "<all_urls>" ],tabId:this._tabId},['extraHeaders']
+                // );
+            });
+        })
         // 记录请求:
-        chrome.webRequest.onBeforeRequest.addListener(
-            (details)=>{
-                console.log(details);
-            },
-            {urls: [ "<all_urls>" ]},['blocking']
-            );
-        chrome.webRequest.onCompleted.addListener(
-            (details)=>{
-                console.log(details);
-
-                if(details.tabId && details.tabId > 0){
-                    chrome.debugger.sendCommand({
-                        tabId: details.tabId
-                    }, "Network.getResponseBody", {
-                        "requestId": details.requestId
-                    }, function(response) {
-                        debugger;
-                        // you get the response body here!
-                        // you can close the debugger tips by:
-                        // chrome.debugger.detach(debuggeeId);
-                    });
-                }
-
-
-            },
-            {urls: [ "<all_urls>" ]},['extraHeaders']
-        );
+        // chrome.webRequest.onBeforeRequest.addListener(
+        //     (details)=>{
+        //         console.log(details);
+        //     },
+        //     {urls: [ "<all_urls>" ]},['blocking']
+        //     );
 
       /**
        * Right click menu setup
@@ -116,10 +142,7 @@ class RecordingController {
         parentId: this._menuId,
         contexts: ['all']
       })
-
       // add the handlers
-
-
 
       this._boundedMenuHandler = this.handleMenuInteraction.bind(this)
       chrome.contextMenus.onClicked.addListener(this._boundedMenuHandler)
@@ -133,6 +156,8 @@ class RecordingController {
     console.debug('stop recording')
     this._badgeState = this._recording.length > 0 ? '1' : ''
 
+    chrome.debugger.detach({tabId:this._tabId});
+
     chrome.runtime.onMessage.removeListener(this._boundedMessageHandler)
     chrome.webNavigation.onCompleted.removeListener(this._boundedNavigationHandler)
     chrome.webNavigation.onBeforeNavigate.removeListener(this._boundedWaitHandler)
@@ -142,7 +167,7 @@ class RecordingController {
     chrome.browserAction.setBadgeText({text: this._badgeState})
     chrome.browserAction.setBadgeBackgroundColor({color: '#45C8F1'})
 
-    chrome.storage.local.set({ recording: this._recording }, () => {
+    chrome.storage.local.set({ recording: this._recording,network:this._network }, () => {
       console.debug('recording stored')
     })
   }
@@ -164,12 +189,15 @@ class RecordingController {
   cleanUp (cb) {
     console.debug('cleanup')
     this._recording = []
+    this._network = {}
     chrome.browserAction.setBadgeText({ text: '' })
     chrome.storage.local.remove('recording', () => {
       console.debug('stored recording cleared')
       if (cb) cb()
     })
   }
+
+
 
   recordCurrentUrl (href) {
     if (!this._hasGoto) {
@@ -194,6 +222,39 @@ class RecordingController {
     this.handleMessage({ selector: undefined, value, action: pptrActions.SCREENSHOT })
   }
 
+  handleNetwork=(details)=>{
+            if(details.tabId && details.tabId > 0){
+
+                chrome.debugger.sendCommand({
+                    tabId: details.tabId
+                }, "Network.getRequestPostData", {
+                    "requestId": details.requestId
+                }, function(response) {
+                    if(!response) {
+                        console.error(chrome.runtime.lastError);
+                    }
+                    debugger;
+                    // you get the response body here!
+                    // you can close the debugger tips by:
+                    // chrome.debugger.detach(debuggeeId);
+                });
+
+                chrome.debugger.sendCommand({
+                    tabId: details.tabId
+                }, "Network.getResponseBody", {
+                    "requestId": details.requestId
+                }, function(response) {
+                    if(!response) {
+                        console.error(chrome.runtime.lastError);
+                    }
+                    debugger;
+                    // you get the response body here!
+                    // you can close the debugger tips by:
+                    // chrome.debugger.detach(debuggeeId);
+                });
+            }
+    }
+
   handleMessage (msg, sender) {
     if (msg.control) return this.handleControlMessage(msg, sender)
 
@@ -203,7 +264,7 @@ class RecordingController {
 
     if (!this._isPaused) {
       this._recording.push(msg)
-      chrome.storage.local.set({ recording: this._recording }, () => {
+      chrome.storage.local.set({ recording: this._recording,network:this._network }, () => {
         console.debug('stored recording updated')
       })
     }
