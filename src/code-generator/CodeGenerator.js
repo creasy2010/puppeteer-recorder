@@ -186,7 +186,7 @@ export default class CodeGenerator {
     block.addLine({
       type: domEvents.CLICK,
       value: `
-      // 点击按钮 ${mark}
+      /* 点击按钮 ${mark} */
       await ${this._frame}.click('${selector}'); 
       await sleep(1)`,
     });
@@ -243,7 +243,10 @@ export default class CodeGenerator {
   _handleGoto(href) {
     return new Block(this._frameId, {
       type: pptrActions.GOTO,
-      value: `await ${this._frame}.goto('${href}')`,
+      value: `
+      await page.evaluate(\`window.__testContext__.goto('${href}')\`)
+      await sleep(2);
+      `,
     });
   }
 

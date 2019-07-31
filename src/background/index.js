@@ -70,27 +70,26 @@ class RecordingController {
             chrome.debugger.attach({tabId:this._tabId},"1.0",(result)=>{
                 chrome.debugger.onEvent.addListener((source,method,params)=>{
                     if(method==='Network.requestWillBeSent') {
-                        let {requestId,request:{url,method,postData}} = params;
-                        let key = `${url}:[${method}]`;
-                        if(this._network[key]) {
-                            this._network[key].push({
-                                url,
-                                postData,
-                                requestId,
-                                method,
-                                response:null
-                            });
-                            _requestRel[requestId] = this._network[key];
+                        let {requestId,request} = params;
+                        let key = `${request.url}:[${request.method}]`;
+                        if(!this._network[key]) {
+                            this._network[key] = [];
                         }
+                        let reqInfo ={
+                            requestId,
+                            request,
+                            response:null
+                        }
+                            this._network[key].push(reqInfo);
+                            _requestRel[requestId] = reqInfo;
                     } else if(method==='Network.responseReceived') {
                         let {requestId,response} = params;
                         chrome.debugger.sendCommand({
                             tabId: this._tabId
                         }, "Network.getResponseBody", {
                             "requestId": requestId
-                        }, function(response) {
-                            let {body,base64Encoded} = response;
-                            _requestRel[requestId].response={...response,body,base64Encoded};
+                        }, function(responseBody) {
+                            _requestRel[requestId].response={...response,...responseBody};
                             if(!response) {
                                 console.error(chrome.runtime.lastError);
                             }
