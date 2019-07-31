@@ -107,9 +107,9 @@ export default class EventRecorder {
 
         let value = e.target.value;
       //TODO 这里的写法不太合适.
-        if(e.type ==='input'){
+        if(e.type ==='input') {
             value=e.data;
-        } else if(e.type === 'keydown'){
+        } else if(e.type === 'keydown') {
             value=e.key;
         }
 
@@ -122,7 +122,7 @@ export default class EventRecorder {
         href: e.target.href ? e.target.href : null,
         coordinates: EventRecorder._getCoordinates(e)
       }
-        if(e.type === 'click'){
+        if(e.type === 'click') {
             msg.mark = e.target.innerText;
         }
       this._sendMessage(msg)

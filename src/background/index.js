@@ -31,7 +31,24 @@ class RecordingController {
     chrome.extension.onConnect.addListener(port => {
       console.debug('listeners connected')
       port.onMessage.addListener(msg => {
-        if (msg.action && msg.action === actions.START) this.start()
+        if (msg.action && msg.action === actions.START){
+
+            chrome.browserAction.setIcon({ path: './images/icon-green.png' })
+            chrome.browserAction.setBadgeText({ text: this._badgeState })
+            chrome.browserAction.setBadgeBackgroundColor({ color: '#FF0000' })
+
+            let isHit= false;
+            //TODO 移除监听 怎么做 ?
+            chrome.history.onVisited.addListener((historyItem)=>{
+                console.log(historyItem);
+                if(isHit){
+                    return ;
+                }
+                isHit=true;
+                this.start();
+            });
+
+        }
         if (msg.action && msg.action === actions.STOP) this.stop()
         if (msg.action && msg.action === actions.CLEAN_UP) this.cleanUp()
         if (msg.action && msg.action === actions.PAUSE) this.pause()
@@ -58,9 +75,9 @@ class RecordingController {
       chrome.webNavigation.onCompleted.addListener(this._boundedNavigationHandler)
       chrome.webNavigation.onBeforeNavigate.addListener(this._boundedWaitHandler)
 
-      chrome.browserAction.setIcon({ path: './images/icon-green.png' })
-      chrome.browserAction.setBadgeText({ text: this._badgeState })
-      chrome.browserAction.setBadgeBackgroundColor({ color: '#FF0000' })
+      // chrome.browserAction.setIcon({ path: './images/icon-green.png' })
+      // chrome.browserAction.setBadgeText({ text: this._badgeState })
+      // chrome.browserAction.setBadgeBackgroundColor({ color: '#FF0000' })
 
 
         chrome.tabs.query({active:true,currentWindow:true},(tab)=>{
@@ -69,8 +86,24 @@ class RecordingController {
             };
             chrome.debugger.attach({tabId:this._tabId},"1.0",(result)=>{
                 chrome.debugger.onEvent.addListener((source,method,params)=>{
+
                     if(method==='Network.requestWillBeSent') {
-                        let {requestId,request} = params;
+
+
+                        let {requestId,request,type} = params;
+                        const IgnoreRequestTypes=[
+                            'Other',
+                            'Image',
+                            'Script',
+                            'Font',
+                            'Other',
+                        ]
+
+                        if(( request.method === 'OPTIONS' ) || IgnoreRequestTypes.includes(type)){
+                            return;
+                        }
+                        // type!== 'XHR' && type !=="Fetch"
+
                         let key = `${request.url}:[${request.method}]`;
                         if(!this._network[key]) {
                             this._network[key] = [];
@@ -84,16 +117,24 @@ class RecordingController {
                             _requestRel[requestId] = reqInfo;
                     } else if(method==='Network.responseReceived') {
                         let {requestId,response} = params;
-                        chrome.debugger.sendCommand({
-                            tabId: this._tabId
-                        }, "Network.getResponseBody", {
-                            "requestId": requestId
-                        }, function(responseBody) {
-                            _requestRel[requestId].response={...response,...responseBody};
-                            if(!response) {
-                                console.error(chrome.runtime.lastError);
-                            }
-                        });
+
+                        if(_requestRel[requestId]){
+                            _requestRel[requestId].response={...response};
+                        }
+                    } else if(method==='Network.loadingFinished') {
+                        let {requestId} = params;
+                        if(_requestRel[requestId]){
+                            chrome.debugger.sendCommand({
+                                tabId: this._tabId
+                            }, "Network.getResponseBody", {
+                                "requestId": requestId
+                            }, function(responseBody) {
+                                console.log('Network.getResponseBody:::>',_requestRel[requestId].request.url, _requestRel[requestId].request.method,responseBody);
+                                _requestRel[requestId].response.base64Encoded = responseBody.base64Encoded;
+                                _requestRel[requestId].response.body = responseBody.body;
+                            });
+
+                        }
                     }
                 });
 

@@ -5,6 +5,7 @@
   "description": "A Chrome extension for recording browser interaction and generating Puppeteer scripts",
   "permissions": [
     "storage",
+    "history",
     "debugger",
     "webRequest",
     "webRequestBlocking",
