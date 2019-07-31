@@ -39,8 +39,16 @@ export default class CodeGenerator {
 
   generate(events,network) {
     return (`
-    ${this._parseEvents(events)}
-    var networkStorage = ${JSON.stringify(network)};
+async function testCaseXXXX(page) :Promise<VoidFunc> {
+
+  let clean = await openIntercepRequest(page,()=>neworkMock);
+  async function TestCase () {
+    ${this._parseEvents(events)} 
+    await clean();
+  }
+  var neworkMock =${JSON.stringify(network)};
+  return TestCase;
+  }
     `
     );
   }
@@ -180,15 +188,14 @@ export default class CodeGenerator {
     if (this._options.waitForSelectorOnClick) {
       block.addLine({
         type: domEvents.CLICK,
-        value: `await ${this._frame}.waitForSelector('${selector}')`,
+        value: `log(\`[clicking]${mark} \`);
+        await waitElementVisiable(page,'${selector}');`,
       });
     }
     block.addLine({
       type: domEvents.CLICK,
-      value: `
-      /* 点击按钮 ${mark} */
-      await ${this._frame}.click('${selector}'); 
-      await sleep(1)`,
+      value: `await ${this._frame}.click('${selector}'); 
+      await sleep(1*Speed)`,
     });
     return block;
   }

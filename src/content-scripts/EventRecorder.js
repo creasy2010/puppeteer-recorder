@@ -113,6 +113,12 @@ export default class EventRecorder {
             value=e.key;
         }
 
+        if(document.querySelectorAll(selector).length>1) {
+            let errorMsg = `${selector}对应多个对象,会导致程序执行不正确!`;
+            console.error(errorMsg);
+            alert(errorMsg);
+        }
+
       const msg = {
         selector: selector,
         value,

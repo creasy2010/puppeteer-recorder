@@ -116,11 +116,11 @@ class RecordingController {
                             _requestRel[requestId] = reqInfo;
                     } else if(method==='Network.responseReceived') {
                         let {requestId,response:{
-                            headers,status
+                            headers,status,mimeType
                         }} = params;
 
-                        if(_requestRel[requestId]){
-                            _requestRel[requestId].response={headers,mimeType};
+                        if(_requestRel[requestId]) {
+                            _requestRel[requestId].response={headers,status,mimeType};
                         }
                     } else if(method==='Network.loadingFinished') {
                         let {requestId} = params;
