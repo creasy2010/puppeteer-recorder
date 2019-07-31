@@ -40,7 +40,6 @@ class RecordingController {
             let isHit= false;
             //TODO 移除监听 怎么做 ?
             chrome.history.onVisited.addListener((historyItem)=>{
-                console.log(historyItem);
                 if(isHit){
                     return ;
                 }
@@ -88,8 +87,6 @@ class RecordingController {
                 chrome.debugger.onEvent.addListener((source,method,params)=>{
 
                     if(method==='Network.requestWillBeSent') {
-
-
                         let {requestId,request,type} = params;
                         const IgnoreRequestTypes=[
                             'Other',
@@ -102,24 +99,28 @@ class RecordingController {
                         if(( request.method === 'OPTIONS' ) || IgnoreRequestTypes.includes(type)){
                             return;
                         }
-                        // type!== 'XHR' && type !=="Fetch"
 
                         let key = `${request.url}:[${request.method}]`;
                         if(!this._network[key]) {
                             this._network[key] = [];
                         }
-                        let reqInfo ={
+                        let reqInfo = {
                             requestId,
-                            request,
+                            request:{
+                                method:request.method,
+                                url:request.url
+                            },
                             response:null
                         }
                             this._network[key].push(reqInfo);
                             _requestRel[requestId] = reqInfo;
                     } else if(method==='Network.responseReceived') {
-                        let {requestId,response} = params;
+                        let {requestId,response:{
+                            headers,status
+                        }} = params;
 
                         if(_requestRel[requestId]){
-                            _requestRel[requestId].response={...response};
+                            _requestRel[requestId].response={headers,mimeType};
                         }
                     } else if(method==='Network.loadingFinished') {
                         let {requestId} = params;
@@ -133,7 +134,6 @@ class RecordingController {
                                 _requestRel[requestId].response.base64Encoded = responseBody.base64Encoded;
                                 _requestRel[requestId].response.body = responseBody.body;
                             });
-
                         }
                     }
                 });
