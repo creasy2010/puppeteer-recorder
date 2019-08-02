@@ -16,6 +16,16 @@ const wrappedHeader = `(async () => {
 const wrappedFooter = `  await browser.close()
 })()`;
 
+
+const toRecordKeyCode=[
+    /*删除*/
+    "Tab",
+    "Enter",
+    /*上下左右*/
+    "ArrowDown","ArrowUp","ArrowLeft" ,"ArrowRight",
+    /*del*/
+    "Delete"
+]
 export const defaults = {
   wrapAsync: true,
   headless: true,
@@ -87,11 +97,13 @@ async function testCaseXXXX(page) :Promise<VoidFunc> {
       // we need to keep a handle on what frames events originate from
       this._setFrames(frameId, frameUrl);
 
+
+
       switch (action) {
         case 'keydown':
-          if (keyCode === 9) {
+          if (toRecordKeyCode.includes(value)) {
             // tab key
-            this._blocks.push(this._handleKeyDown(selector, value, keyCode));
+            this._blocks.push(this._handleKeyDown(selector, value));
           }
           break;
         case 'click':
@@ -174,11 +186,13 @@ async function testCaseXXXX(page) :Promise<VoidFunc> {
     }
   }
 
-  _handleKeyDown(selector, value) {
+  _handleKeyDown(selector, keyCode) {
     const block = new Block(this._frameId);
     block.addLine({
       type: domEvents.KEYDOWN,
-      value: `await ${this._frame}.type('${selector}', '${value}')`,
+      value: `await ${this._frame}.keyboard.press('${keyCode}'); 
+              await sleep(0.5*Speed)
+      `,
     });
     return block;
   }

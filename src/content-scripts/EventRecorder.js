@@ -144,7 +144,7 @@ export default class EventRecorder {
   }
 
   _handleScreenshotMode (isClipped) {
-    this._disableClickRecording()
+    this._disableClickRecording();
     this._uiController = new UIController({ showSelector: isClipped })
     this._screenShotMode = !this._screenShotMode
     document.body.style.cursor = 'crosshair'

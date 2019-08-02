@@ -81,62 +81,10 @@ class RecordingController {
 
         chrome.tabs.query({active:true,currentWindow:true},(tab)=>{
             this._tabId = tab[0].id;
-            let _requestRel = {
+            this._requestRel = {
             };
             chrome.debugger.attach({tabId:this._tabId},"1.0",(result)=>{
-                chrome.debugger.onEvent.addListener((source,method,params)=>{
-
-                    if(method==='Network.requestWillBeSent') {
-                        let {requestId,request,type} = params;
-                        const IgnoreRequestTypes=[
-                            'Other',
-                            'Image',
-                            'Script',
-                            'Font',
-                            'Other',
-                        ]
-
-                        if(( request.method === 'OPTIONS' ) || IgnoreRequestTypes.includes(type)){
-                            return;
-                        }
-
-                        let key = `${request.url}:[${request.method}]`;
-                        if(!this._network[key]) {
-                            this._network[key] = [];
-                        }
-                        let reqInfo = {
-                            requestId,
-                            request:{
-                                method:request.method,
-                                url:request.url
-                            },
-                            response:null
-                        }
-                            this._network[key].push(reqInfo);
-                            _requestRel[requestId] = reqInfo;
-                    } else if(method==='Network.responseReceived') {
-                        let {requestId,response:{
-                            headers,status,mimeType
-                        }} = params;
-
-                        if(_requestRel[requestId]) {
-                            _requestRel[requestId].response={headers,status,mimeType};
-                        }
-                    } else if(method==='Network.loadingFinished') {
-                        let {requestId} = params;
-                        if(_requestRel[requestId]){
-                            chrome.debugger.sendCommand({
-                                tabId: this._tabId
-                            }, "Network.getResponseBody", {
-                                "requestId": requestId
-                            }, function(responseBody) {
-                                console.log('Network.getResponseBody:::>',_requestRel[requestId].request.url, _requestRel[requestId].request.method,responseBody);
-                                _requestRel[requestId].response.base64Encoded = responseBody.base64Encoded;
-                                _requestRel[requestId].response.body = responseBody.body;
-                            });
-                        }
-                    }
-                });
+                chrome.debugger.onEvent.addListener(this.handleNetwork);
 
                 chrome.debugger.sendCommand({
                     tabId: this._tabId
@@ -202,14 +150,11 @@ class RecordingController {
     chrome.webNavigation.onCompleted.removeListener(this._boundedNavigationHandler)
     chrome.webNavigation.onBeforeNavigate.removeListener(this._boundedWaitHandler)
     chrome.contextMenus.onClicked.removeListener(this._boundedMenuHandler)
-
+    chrome.debugger.onEvent.removeListener(this.handleNetwork);
     chrome.browserAction.setIcon({ path: './images/icon-black.png' })
     chrome.browserAction.setBadgeText({text: this._badgeState})
     chrome.browserAction.setBadgeBackgroundColor({color: '#45C8F1'})
-
-    chrome.storage.local.set({ recording: this._recording,network:this._network }, () => {
-      console.debug('recording stored')
-    })
+    this.saveRecords();
   }
 
   pause () {
@@ -231,7 +176,7 @@ class RecordingController {
     this._recording = []
     this._network = {}
     chrome.browserAction.setBadgeText({ text: '' })
-    chrome.storage.local.remove('recording', () => {
+    chrome.storage.local.remove(['recording','network'], () => {
       console.debug('stored recording cleared')
       if (cb) cb()
     })
@@ -262,38 +207,72 @@ class RecordingController {
     this.handleMessage({ selector: undefined, value, action: pptrActions.SCREENSHOT })
   }
 
-  handleNetwork=(details)=>{
-            if(details.tabId && details.tabId > 0){
+  handleNetwork= (source,method,params)=>{
+      if(this._isPaused){
+          return;
+      }
 
-                chrome.debugger.sendCommand({
-                    tabId: details.tabId
-                }, "Network.getRequestPostData", {
-                    "requestId": details.requestId
-                }, function(response) {
-                    if(!response) {
-                        console.error(chrome.runtime.lastError);
-                    }
-                    debugger;
-                    // you get the response body here!
-                    // you can close the debugger tips by:
-                    // chrome.debugger.detach(debuggeeId);
-                });
+          if(method==='Network.requestWillBeSent') {
+              let {requestId,request,type} = params;
+              const IgnoreRequestTypes=[
+                  'Other',
+                  'Image',
+                  'Script',
+                  'Font',
+                  'Other',
+              ]
 
-                chrome.debugger.sendCommand({
-                    tabId: details.tabId
-                }, "Network.getResponseBody", {
-                    "requestId": details.requestId
-                }, function(response) {
-                    if(!response) {
-                        console.error(chrome.runtime.lastError);
-                    }
-                    debugger;
-                    // you get the response body here!
-                    // you can close the debugger tips by:
-                    // chrome.debugger.detach(debuggeeId);
-                });
-            }
-    }
+              if(( request.method === 'OPTIONS' ) || IgnoreRequestTypes.includes(type)){
+                  return;
+              }
+
+              if(this._requestRel[requestId]){
+                  console.warn('同一个requestid发送多次:',source,method,params);
+                  //解决重复的问题;
+                  return;
+              }
+
+              let key = `${request.url}:[${request.method}]`;
+              if(!this._network[key]) {
+                  this._network[key] = [];
+              }
+              let reqInfo = {
+                  requestId,
+                  request:{
+                      method:request.method,
+                      url:request.url
+                  },
+                  response:null
+              }
+              console.log('this._network[key].push',key,requestId);
+              this._network[key].push(reqInfo);
+              this._requestRel[requestId] = reqInfo;
+          } else if(method==='Network.responseReceived') {
+              let {requestId,response:{
+                  headers,status,mimeType
+              }} = params;
+
+              if(this._requestRel[requestId]) {
+                  this._requestRel[requestId].response={headers,status,mimeType};
+              }
+          } else if(method==='Network.loadingFinished') {
+              let {requestId} = params;
+              if(this._requestRel[requestId]) {
+                  let requestInfo = this._requestRel[requestId];
+                  // delete this._requestRel[requestId];
+                  chrome.debugger.sendCommand({
+                      tabId: this._tabId
+                  }, "Network.getResponseBody", {
+                      "requestId": requestId
+                  }, (responseBody)=> {
+                      console.log('Network.getResponseBody:::>',requestId,requestInfo.request.url, requestInfo.request.method,responseBody);
+                      requestInfo.response.base64Encoded = responseBody.base64Encoded;
+                      requestInfo.response.body = responseBody.body;
+                      this.saveRecords();
+                  });
+              }
+          }
+      }
 
   handleMessage (msg, sender) {
     if (msg.control) return this.handleControlMessage(msg, sender)
@@ -303,11 +282,25 @@ class RecordingController {
     msg.frameUrl = sender ? sender.url : null
 
     if (!this._isPaused) {
-      this._recording.push(msg)
-      chrome.storage.local.set({ recording: this._recording,network:this._network }, () => {
-        console.debug('stored recording updated')
-      })
+      this._recording.push(msg);
+        this.saveRecords();
     }
+  }
+
+  _timeout=null;
+
+  saveRecords=()=>{
+      if(this._timeout) { //如果timeout存在则
+          this._timeout =  clearTimeout(this._timeout);
+          this.saveRecords();
+      }
+
+      this._timeout = setTimeout(()=>{
+          this._timeout=null;
+          chrome.storage.local.set({ recording: this._recording,network:this._network }, () => {
+              console.debug('stored recording updated')
+          })
+      },2000);
   }
 
   handleControlMessage (msg, sender) {
