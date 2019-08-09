@@ -119,8 +119,12 @@ export default class EventRecorder {
             return ;
 
         } else if(e.type === 'scroll') {
+            //TODO 记录多次的问题? 现在先不解决后面解决;
             console.log( 'scroll,==>',e.target.scrollLeft,e.target.scrollTop)
-            debugger;
+            value= {
+                left:e.target.scrollLeft,
+                top:e.target.scrollTop,
+            }
 
         } else if(e.type === 'keyup') {
 

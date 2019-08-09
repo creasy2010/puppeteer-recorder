@@ -135,6 +135,9 @@ async function testCaseXXXX(page) :Promise<VoidFunc> {
               }
 
           break;
+        case 'scroll':
+            this._blocks.push(this._handleScroll(selector, value));
+            break;
         case 'click':
           this._blocks.push(this._handleClick(selector, events[i].mark));
           break;
@@ -243,6 +246,22 @@ async function testCaseXXXX(page) :Promise<VoidFunc> {
       `,
     });
     return block;
+  }
+
+  _handleScroll(selector,{left,top}) {
+      const block = new Block(this._frameId);
+      block.addLine({
+          type: domEvents.KEYDOWN,
+          value: `
+           await page.evaluate(async () => {
+                await new Promise((resolve, reject) => {
+                   document.querySelector('${selector}').scrollTo(${left},${top)
+                });
+           });
+           await sleep(1*Speed);
+      `,
+      });
+      return block;
   }
 
   _handleClick(selector,mark) {
