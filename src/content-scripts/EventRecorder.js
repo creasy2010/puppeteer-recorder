@@ -93,6 +93,7 @@ export default class EventRecorder {
     }
   }
 
+  keyDowns=[];
   _recordEvent (e) {
     if (this._previousEvent && this._previousEvent.timeStamp === e.timeStamp) return
     this._previousEvent = e
@@ -110,7 +111,29 @@ export default class EventRecorder {
         if(e.type ==='input') {
             value=e.data;
         } else if(e.type === 'keydown') {
-            value=e.key;
+            this.keyDowns.push({
+                keyCode: e.keyCode,
+                key:e.key
+            })
+            console.log(`this.keyDowns:${JSON.stringify(this.keyDowns)}`);
+            return ;
+
+        } else if(e.type === 'scroll') {
+            console.log( 'scroll,==>',e.target.scrollLeft,e.target.scrollTop)
+            debugger;
+
+        } else if(e.type === 'keyup') {
+
+            if(this.keyDowns.length === 1 ) {
+                value = e.key;
+            } else if(this.keyDowns.length ===  0) {
+                //组合键的记录,被处理下去了
+                return ;
+            } else {
+                value = this.keyDowns.map(item=>item.key);
+                console.log(`结合键结果:${value}`);
+            }
+            this.keyDowns = [];
         }
 
         if(document.querySelectorAll(selector).length>1) {

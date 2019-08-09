@@ -13,16 +13,29 @@ const wrappedHeader = `(async () => {
   const browser = await puppeteer.launch()
   const page = await browser.newPage()\n`;
 
-const wrappedFooter = `  await browser.close()
+const wrappedFooter = `await browser.close()
 })()`;
 
 
+//组合键 ctrl+v ctrl+c    command + a(全选)
+//
 const toRecordKeyCode=[
+
+    /*command*/
+    "Meta",
     /*删除*/
     "Tab",
+    "Ctrl",
     "Enter",
+
+    //字母
+    "c",
+    "v",
+    "a",
+
     /*上下左右*/
     "ArrowDown","ArrowUp","ArrowLeft" ,"ArrowRight",
+
     /*del*/
     "Delete"
 ]
@@ -96,15 +109,31 @@ async function testCaseXXXX(page) :Promise<VoidFunc> {
 
       // we need to keep a handle on what frames events originate from
       this._setFrames(frameId, frameUrl);
-
-
+      console.log("gene action",action);
 
       switch (action) {
-        case 'keydown':
-          if (toRecordKeyCode.includes(value)) {
-            // tab key
-            this._blocks.push(this._handleKeyDown(selector, value));
-          }
+          case 'keyup':
+            //TODO  单键, 或组合键 ;
+              debugger;
+              if( value instanceof Array) {
+                  debugger;
+                let isCheck = value.filter(item=>toRecordKeyCode.includes(item))
+                    .length === value.length;
+                console.log('快捷键生成:',JSON.stringify(value));
+
+                if( isCheck ) {
+                    this._blocks.push(this._handleCompositeKeyDown(selector, value));
+                }else{
+                    console.log('快捷键包含非法字符过滤掉:',JSON.stringify(value));
+                }
+
+              } else if(typeof value  === 'string') {
+                  if (toRecordKeyCode.includes(value)) {
+                      // tab key
+                      this._blocks.push(this._handleKeyDown(selector, value));
+                  }
+              }
+
           break;
         case 'click':
           this._blocks.push(this._handleClick(selector, events[i].mark));
@@ -185,6 +214,25 @@ async function testCaseXXXX(page) :Promise<VoidFunc> {
       this._postProcessAddBlankLines();
     }
   }
+
+
+    _handleCompositeKeyDown(selector, keyCodes) {
+      console.log('_handleCompositeKeyDown',keyCodes);
+        const block = new Block(this._frameId);
+
+        let pressDownStr = keyCodes.map(keyCode=>`await ${this._frame}.keyboard.pressDown('${keyCode}');`)
+        let pressUpStr = keyCodes.map(keyCode=>`await ${this._frame}.keyboard.pressUp('${keyCode}');`)
+
+        block.addLine({
+            type: domEvents.KEYDOWN,
+            value: `${pressDownStr}
+              await sleep(0.2*Speed); 
+            ${pressUpStr}
+              await sleep(0.5*Speed); 
+      `,
+        });
+        return block;
+    }
 
   _handleKeyDown(selector, keyCode) {
     const block = new Block(this._frameId);

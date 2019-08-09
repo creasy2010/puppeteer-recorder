@@ -3,6 +3,8 @@ export default {
   DBLCLICK: 'dblclick',
   CHANGE: 'change',
   KEYDOWN: 'keydown',
+  SCROLL: 'scroll',
+  KEYUP: 'keyup',
   SELECT: 'select',
   SUBMIT: 'submit',
   // MOUSEOVER: 'mouseover',
